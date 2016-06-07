@@ -76,6 +76,84 @@ class MapOracle(object):
         # Note that these actions are GLOBALLY-JUSTIFIED to the board, not to the current dir of the bot
         return good_actions
 
+    def makeMove(self, state, action):
+        newState = self.map.advanceState(state, action)
+
+        if newState.isWall:
+            newState = State(Point(state.loc.row, state.loc.col))
+        if state.isPit:
+            newState = State(Point(state.loc.row, state.loc.col))
+        
+        return newState
+
+
+class UncertainMapOracle(MapOracle):
+    def __init__(self, refMap, r_w, r_s, r_g, r_p, p_f, p_b, p_l, p_r):
+        super(UncertainMapOracle, self).__init__(refMap, r_w, r_s, r_g, r_p)
+        self.p_forward = p_f
+        self.p_backward = p_b
+        self.p_left = p_l
+        self.p_right = p_r
+
+    def makeMove(self, state, action):
+        move_bindings = {
+            AStarSearch.ACTION_LEFT: self.p_forward,
+            AStarSearch.ACTION_RIGHT: self.p_backward,
+            AStarSearch.ACTION_DOWN: self.p_left,
+            AStarSearch.ACTION_UP: self.p_right
+        }
+
+        if action == AStarSearch.ACTION_LEFT:
+            move_bindings = {
+                AStarSearch.ACTION_LEFT: self.p_forward,
+                AStarSearch.ACTION_RIGHT: self.p_backward,
+                AStarSearch.ACTION_DOWN: self.p_left,
+                AStarSearch.ACTION_UP: self.p_right
+            }
+        elif action == AStarSearch.ACTION_RIGHT:
+            move_bindings = {
+                AStarSearch.ACTION_LEFT: self.p_backward,
+                AStarSearch.ACTION_RIGHT: self.p_forward,
+                AStarSearch.ACTION_DOWN: self.p_right,
+                AStarSearch.ACTION_UP: self.p_left
+            }
+        elif action == AStarSearch.ACTION_UP:
+            move_bindings = {
+                AStarSearch.ACTION_LEFT: self.p_left,
+                AStarSearch.ACTION_RIGHT: self.p_right,
+                AStarSearch.ACTION_DOWN: self.p_backward,
+                AStarSearch.ACTION_UP: self.p_forward
+            }
+        elif action == AStarSearch.ACTION_DOWN:
+            move_bindings = {
+                AStarSearch.ACTION_LEFT: self.p_right,
+                AStarSearch.ACTION_RIGHT: self.p_left,
+                AStarSearch.ACTION_DOWN: self.p_forward,
+                AStarSearch.ACTION_UP: self.p_backward
+            }
+        else:
+            print "This should have never happened."
+
+        tsum = 0
+        rnum = random.random()
+        actual_action = action
+        for pick in move_bindings.keys():
+            if move_bindings[pick] <= 0.0:
+                continue
+            tsum += move_bindings[pick]
+            if rnum <= tsum:
+                #print "Changing actual action from " + str(action) + " to " + str(actual_action)
+                actual_action = pick
+                break
+
+        newState = self.map.advanceState(state, actual_action)
+        if newState.isWall:
+            newState = State(Point(state.loc.row, state.loc.col))
+        if state.isPit:
+            newState = State(Point(state.loc.row, state.loc.col))
+
+        return newState
+
 
 class MDPOracle(object):
     def __init__(self, mapOracle, p_f, p_b, p_l, p_r):
@@ -161,7 +239,7 @@ class QLearner(object):
         print "\tAction to be taken: " + str(action)
 
         #newState = self.map_oracle.map.advanceState(self.currentState, action)
-        newState = self.makeMove(self.currentState, action)
+        newState = self.map_oracle.makeMove(self.currentState, action)
         print "\tEnded in state: " + str(newState)
         # Decide what reward we got.
         reward = self.map_oracle.getReward(self.currentState, action, newState)
@@ -171,16 +249,6 @@ class QLearner(object):
 
         self.currentState = newState
         return True
-
-    def makeMove(self, state, action):
-        newState = self.map_oracle.map.advanceState(state, action)
-
-        if newState.isWall:
-            newState = State(Point(state.loc.row, state.loc.col))
-        if state.isPit:
-            newState = State(Point(state.loc.row, state.loc.col))
-        
-        return newState
 
     def update(self, state, action, nextState, reward):
         # Main eq:

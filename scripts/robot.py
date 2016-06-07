@@ -16,8 +16,14 @@ class Robot():
                        [self.config.goalState], self.config.map_width,
                        self.config.map_height)
 
-        self.map_oracle = MapOracle(self.map, self.config.r_wall,
-                                    self.config.r_step, self.config.r_goal, self.config.r_pit)
+        #self.map_oracle = MapOracle(self.map, self.config.r_wall,
+        #                            self.config.r_step, self.config.r_goal, self.config.r_pit)
+
+        self.map_oracle = UncertainMapOracle(self.map, self.config.r_wall,
+                                    self.config.r_step, self.config.r_goal, self.config.r_pit, 
+                                    self.config.p_forward, self.config.p_backward, 
+                                    self.config.p_left, self.config.p_right)
+
         self.mdp_oracle = MDPOracle(self.map_oracle, self.config.p_forward, self.config.p_backward,
                                    self.config.p_left, self.config.p_right)
 
