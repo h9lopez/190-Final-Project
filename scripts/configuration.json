@@ -27,6 +27,7 @@
   "discount_factor": 0.99,
 
   "learning_rate": 0.2,
+  "epsilon": 0.4,
 
   "prob_move_forward": 0.8,
   "prob_move_backward": 0.0,

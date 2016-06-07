@@ -143,6 +143,7 @@ class QLearner(object):
 
     def single_iteration(self):
         if self.currentState is None: # First round iter
+            print "Picking initial state at random."
             # NOTE: This starting state *may* end up being a goal state. Make sure that doesn't happen.
             tempState = random.sample(self.map_oracle.getStates(), 1)[0]
             while self.map_oracle.map.isGoalState(tempState):
@@ -151,13 +152,17 @@ class QLearner(object):
 
         print "Currently at state " + str(self.currentState)
 
-        if self.map_oracle.map.isGoalState(self.currentState):
-            print "Current state is goal state."
+        if self.map_oracle.map.isGoalState(self.currentState) or self.currentState.isPit:
+            self.currentState = None
+            print "Current state is goal state or Pit, end episode."
             return False # CANNOT continue.
 
         action = self.getNextAction(self.currentState)
+        print "\tAction to be taken: " + str(action)
 
-        newState = self.map_oracle.map.advanceState(self.currentState, action)
+        #newState = self.map_oracle.map.advanceState(self.currentState, action)
+        newState = self.makeMove(self.currentState, action)
+        print "\tEnded in state: " + str(newState)
         # Decide what reward we got.
         reward = self.map_oracle.getReward(self.currentState, action, newState)
 
@@ -167,13 +172,25 @@ class QLearner(object):
         self.currentState = newState
         return True
 
+    def makeMove(self, state, action):
+        newState = self.map_oracle.map.advanceState(state, action)
+
+        if newState.isWall:
+            newState = State(Point(state.loc.row, state.loc.col))
+        if state.isPit:
+            newState = State(Point(state.loc.row, state.loc.col))
+        
+        return newState
+
     def update(self, state, action, nextState, reward):
         # Main eq:
         # Q(s,a) = Q(s,a) + alpha*[R(s) + gamma*max_a{Q(s',a')} - Q(s,a)]
 
         # Pick the best Q(s',a') pair.============================================
 
-        ns_qval = max(map(lambda a: self.qvalues[(nextState, a)] if self.qvalues.has_key((nextState, a)) else 0, self.map_oracle.getPossibleActions(nextState)))
+        ns_list = map(lambda a: self.qvalues[(nextState, a)] if self.qvalues.has_key((nextState, a)) else 0, self.map_oracle.getPossibleActions(nextState))
+
+        ns_qval = max(ns_list) if len(ns_list) > 0 else 0.0
 
         old_qval = self.qvalues[ (state, action) ] if self.qvalues.has_key( (state, action) ) else 0
 
@@ -191,6 +208,7 @@ class QLearner(object):
             return None
 
         if random.random() < self.epsilon:
+            print "Picking random choice."
             return random.choice(legalActions)
         return self.getOptimalAction(state)
 

@@ -37,11 +37,15 @@ class Robot():
 
     def doLearningMain(self):
         for x in xrange(0, self.config.max_iterations):
+            print "Running episode " + str(x)
+            while True:
+                res = self.q_learner.single_iteration()
+                self.publishIterationPolicies(self.q_learner.gatherPolicies())
+                if not res:
+                    print "Episode finished."
+                    break
             print "Round " + str(x) + "/" + str(self.config.max_iterations) + " done"
-            if not self.q_learner.single_iteration():
-                print "They told us to break. So we breaking."
-                break
-            self.publishIterationPolicies(self.q_learner.gatherPolicies())
+
         self.doShutdown()
 
     def doMain(self):
