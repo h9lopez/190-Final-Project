@@ -83,7 +83,7 @@ class MapOracle(object):
             newState = State(Point(state.loc.row, state.loc.col))
         if state.isPit:
             newState = State(Point(state.loc.row, state.loc.col))
-        
+
         return newState
 
 
@@ -286,6 +286,70 @@ class QLearner(object):
             s = State(Point(row, col))
             arr[row][col] = self.getOptimalAction(s)
         return arr
+
+class FeatureExtractor(object):
+    def __init__(self, map_oracle):
+        self.mapRef = map_oracle
+
+    def getFeatures(self, state, action):
+        features = {}
+        # F1: 1 if action will take robot into a pit
+        # F2: 1 if action will take robot into a wall
+        # F3: 1 if action will take robot into goal
+
+        # At least this weight is always here.
+        features["default"] = 1.0
+        features["hit_pit"] = 0.0
+        features["hit_wall"] = 0.0
+        features["hit_goal"] = 0.0
+
+        newState = self.mapRef.makeMove(state, action)
+
+        if newState.isPit:
+            features["hit_pit"] = 1.0
+        if newState.isWall:
+            features["hit_wall"] = 1.0
+        if self.mapRef.map.isGoalState(newState):
+            features["hit_goal"] = 1.0
+
+        # Don't think I need normalization for this.
+
+        return features
+
+
+class ApproximateQLearner(QLearner):
+    def __init__(self, mapOracle, discount, learning_rate, epsilon, featureExtractor):
+        super(ApproximateQLearner, self).__init__(mapOracle, discount, learning_rate, epsilon)
+        self.featureExtractor = featureExtractor
+        self.weights = {"default": 1.0, "hit_pit": 0.0, "hit_wall": 0.0, "hit_goal":0.0}
+
+    def __computeQValue(self, state, action):
+        weighted_sum = 0
+        features = self.featureExtractor.getFeatures(state, action)
+        for feature in features:
+            weighted_sum += self.weights[feature]*features[feature]
+        return weighted_sum
+
+    def update(self, state, action, nextState, reward):
+        ns_list = map(lambda a: self.__computeQValue(nextState, a), self.map_oracle.getPossibleActions(nextState))
+
+        ns_qval = max(ns_list) if len(ns_list) > 0 else 0.0
+
+        old_qval = self.__computeQValue(state, action)
+
+        features = self.featureExtractor.getFeatures(state, action)
+
+        delta = (reward + self.discount*ns_qval) - old_qval
+
+        for weight in self.weights:
+            self.weights[weight] = self.weights[weight] + self.alpha*delta*features[weight]
+
+    def getOptimalAction(self, state):
+        action_pairs = map(lambda a: tuple((self.__computeQValue(state, a), a)), self.map_oracle.getPossibleActions(state))
+
+        max_action = max(action_pairs)[1] if len(action_pairs) > 0 else None
+        return max_action
+
 
 class ValueIteration(object):
     def __init__(self, mdp, discount, max_iters = 1000, threshold = None):
