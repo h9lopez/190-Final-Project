@@ -30,8 +30,12 @@ class Robot():
         self.val_iter = ValueIteration(self.mdp_oracle, self.config.discount_factor,
                                        self.config.max_iterations, self.config.threshold_diff)
 
-        self.q_learner = QLearner(self.map_oracle, self.config.discount_factor, self.config.alpha,
-                                    self.config.epsilon)
+        #self.q_learner = QLearner(self.map_oracle, self.config.discount_factor, self.config.alpha,
+        #                            self.config.epsilon)
+        self.featureExtractor = FeatureExtractor(self.map_oracle)
+        self.q_learner = ApproximateQLearner(self.map_oracle, self.config.discount_factor, 
+                                             self.config.alpha, self.config.epsilon,
+                                             self.featureExtractor)
 
         self.initConnections()
 

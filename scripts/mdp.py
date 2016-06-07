@@ -227,8 +227,9 @@ class QLearner(object):
             while self.map_oracle.map.isGoalState(tempState):
                 tempState = random.sample(self.map_oracle.getStates(), 1)[0]
             self.currentState = tempState
+            print "\tPicked " + str(self.currentState)
 
-        print "Currently at state " + str(self.currentState)
+        #print "Currently at state " + str(self.currentState)
 
         if self.map_oracle.map.isGoalState(self.currentState) or self.currentState.isPit:
             self.currentState = None
@@ -236,11 +237,11 @@ class QLearner(object):
             return False # CANNOT continue.
 
         action = self.getNextAction(self.currentState)
-        print "\tAction to be taken: " + str(action)
+        #print "\tAction to be taken: " + str(action)
 
         #newState = self.map_oracle.map.advanceState(self.currentState, action)
         newState = self.map_oracle.makeMove(self.currentState, action)
-        print "\tEnded in state: " + str(newState)
+        #print "\tEnded in state: " + str(newState)
         # Decide what reward we got.
         reward = self.map_oracle.getReward(self.currentState, action, newState)
 
@@ -276,7 +277,7 @@ class QLearner(object):
             return None
 
         if random.random() < self.epsilon:
-            print "Picking random choice."
+            #print "Picking random choice."
             return random.choice(legalActions)
         return self.getOptimalAction(state)
 
@@ -303,7 +304,8 @@ class FeatureExtractor(object):
         features["hit_wall"] = 0.0
         features["hit_goal"] = 0.0
 
-        newState = self.mapRef.makeMove(state, action)
+        #newState = self.mapRef.makeMove(state, action)
+        newState = self.mapRef.map.advanceState(state, action)
 
         if newState.isPit:
             features["hit_pit"] = 1.0
@@ -311,6 +313,10 @@ class FeatureExtractor(object):
             features["hit_wall"] = 1.0
         if self.mapRef.map.isGoalState(newState):
             features["hit_goal"] = 1.0
+
+        # Calculate closeness to the goal.
+        goal_heuristic = self.mapRef.map.calcHeuristic(newState)
+        features["goal_closeness"] = float(goal_heuristic)/(self.mapRef.map.map_width * self.mapRef.map.map_height)
 
         # Don't think I need normalization for this.
 
@@ -321,7 +327,8 @@ class ApproximateQLearner(QLearner):
     def __init__(self, mapOracle, discount, learning_rate, epsilon, featureExtractor):
         super(ApproximateQLearner, self).__init__(mapOracle, discount, learning_rate, epsilon)
         self.featureExtractor = featureExtractor
-        self.weights = {"default": 1.0, "hit_pit": 0.0, "hit_wall": 0.0, "hit_goal":0.0}
+        self.weights = {"default": 1.0, "hit_pit": random.random(), "hit_wall": random.random(), "hit_goal":random.random(), "goal_closeness": random.random()}
+       
 
     def __computeQValue(self, state, action):
         weighted_sum = 0
@@ -343,6 +350,14 @@ class ApproximateQLearner(QLearner):
 
         for weight in self.weights:
             self.weights[weight] = self.weights[weight] + self.alpha*delta*features[weight]
+
+        #self.printWeights()
+
+    def printWeights(self):
+        print "WEIGHTS: {",
+        for w in self.weights:
+            print str(w) + " -> " + str(self.weights[w]) + ", ",
+        print "}\n"
 
     def getOptimalAction(self, state):
         action_pairs = map(lambda a: tuple((self.__computeQValue(state, a), a)), self.map_oracle.getPossibleActions(state))
