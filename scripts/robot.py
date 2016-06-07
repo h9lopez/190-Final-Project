@@ -24,7 +24,8 @@ class Robot():
         self.val_iter = ValueIteration(self.mdp_oracle, self.config.discount_factor,
                                        self.config.max_iterations, self.config.threshold_diff)
 
-        self.q_learner = QLearner(self.map_oracle, self.config.discount_factor, self.config.alpha)
+        self.q_learner = QLearner(self.map_oracle, self.config.discount_factor, self.config.alpha,
+                                    self.config.epsilon)
 
         self.initConnections()
 
@@ -149,6 +150,7 @@ class ConfigAccess(object):
         self.r_pit = self.config["reward_for_falling_in_pit"]
         self.discount_factor = self.config["discount_factor"]
         self.alpha = self.config["learning_rate"]
+        self.epsilon = self.config["epsilon"]
         self.p_forward = self.config["prob_move_forward"]
         self.p_backward = self.config["prob_move_backward"]
         self.p_left = self.config["prob_move_left"]

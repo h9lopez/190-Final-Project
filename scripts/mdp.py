@@ -133,11 +133,12 @@ class MDPOracle(object):
         return res
 
 class QLearner(object):
-    def __init__(self, mapOracle, discount, learning_rate):
+    def __init__(self, mapOracle, discount, learning_rate, epsilon):
         self.map_oracle = mapOracle
         self.discount = discount
         self.qvalues = {}
         self.alpha = learning_rate
+        self.epsilon = epsilon
         self.currentState = None
 
     def single_iteration(self):
@@ -185,7 +186,12 @@ class QLearner(object):
         return max_action
 
     def getNextAction(self, state):
-        # TODO: Add in random epsilon exploration here.
+        legalActions = self.map_oracle.getPossibleActions(state)
+        if len(legalActions) <= 0:
+            return None
+
+        if random.random() < self.epsilon:
+            return random.choice(legalActions)
         return self.getOptimalAction(state)
 
     def gatherPolicies(self):
