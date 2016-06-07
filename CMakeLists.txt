@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(cse_190_assi_3)
+project(cse_190_final_project)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)

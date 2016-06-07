@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <package>
-  <name>cse_190_assi_3</name>
+  <name>cse_190_final_project</name>
     <version>0.0.0</version>
-    <description>The cse_190_assi_3 package</description>
+    <description>The cse_190_final_project package</description>
 
-    <maintainer email="sean@todo.todo">sean</maintainer>
+    <maintainer email="hlopez137@gmail.com">Huandari Lopez</maintainer>
 
 
     <license>TODO</license>

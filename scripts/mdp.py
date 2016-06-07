@@ -77,9 +77,9 @@ class MapOracle(object):
         return good_actions
 
 
-class MDPOracle(MapOracle):
-    def __init__(self, refMap, p_f, p_b, p_l, p_r):
-        super(refMap)
+class MDPOracle(object):
+    def __init__(self, mapOracle, p_f, p_b, p_l, p_r):
+        self.map_oracle = mapOracle
         self.p_forward = p_f
         self.p_backward = p_b
         self.p_left = p_l
@@ -128,7 +128,7 @@ class MDPOracle(MapOracle):
             print "This should have never happened."
 
         res = []
-        for n, method in self.__neighborExpansionAdaptor(state):
+        for n, method in self.map_oracle.__neighborExpansionAdaptor(state):
             res.append( (n, move_bindings[method]) )
         return res
 
@@ -143,13 +143,18 @@ class QLearner(object):
     def single_iteration(self):
         if self.currentState is None: # First round iter
             # NOTE: This starting state *may* end up being a goal state. Make sure that doesn't happen.
-            self.currentState = random.sample(self.map_oracle.getStates())
+            tempState = random.sample(self.map_oracle.getStates(), 1)[0]
+            while self.map_oracle.map.isGoalState(tempState):
+                tempState = random.sample(self.map_oracle.getStates(), 1)[0]
+            self.currentState = tempState
+
+        print "Currently at state " + str(self.currentState)
 
         if self.map_oracle.map.isGoalState(self.currentState):
             print "Current state is goal state."
             return False # CANNOT continue.
 
-        action = getNextAction(self.currentState)
+        action = self.getNextAction(self.currentState)
 
         newState = self.map_oracle.map.advanceState(self.currentState, action)
         # Decide what reward we got.
@@ -167,14 +172,14 @@ class QLearner(object):
 
         # Pick the best Q(s',a') pair.============================================
 
-        ns_qval = max(map(lambda a: self.qvalues[(nextState, a)] if self.qvalues.has_key((nextState, a)) else 0, self.getLegalActions(nextState)))
+        ns_qval = max(map(lambda a: self.qvalues[(nextState, a)] if self.qvalues.has_key((nextState, a)) else 0, self.map_oracle.getPossibleActions(nextState)))
 
         old_qval = self.qvalues[ (state, action) ] if self.qvalues.has_key( (state, action) ) else 0
 
         self.qvalues[ (state, action) ] = old_qval + self.alpha*(reward + self.discount*ns_qval - old_qval)
 
     def getOptimalAction(self, state):
-        action_pairs = map(lambda a: tuple((self.qvalues[(state, a)] if self.qvalues.has_key((state,a)) else 0, a)) )
+        action_pairs = map(lambda a: tuple((self.qvalues[(state, a)] if self.qvalues.has_key((state,a)) else 0, a)), self.map_oracle.getPossibleActions(state))
 
         max_action = max(action_pairs)[1] if len(action_pairs) > 0 else None
         return max_action
@@ -184,8 +189,8 @@ class QLearner(object):
         return self.getOptimalAction(state)
 
     def gatherPolicies(self):
-        arr = [[0 for x in xrange(0, self.mdp.map.map_width)] for y in xrange(0, self.mdp.map.map_height)]
-        for row, col in product(xrange(0, self.mdp.map.map_height), xrange(0, self.mdp.map.map_width)):
+        arr = [[0 for x in xrange(0, self.map_oracle.map.map_width)] for y in xrange(0, self.map_oracle.map.map_height)]
+        for row, col in product(xrange(0, self.map_oracle.map.map_height), xrange(0, self.map_oracle.map.map_width)):
             s = State(Point(row, col))
             arr[row][col] = self.getOptimalAction(s)
         return arr
