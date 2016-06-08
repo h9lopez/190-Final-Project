@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
+import sys
 from std_msgs.msg import Bool
 from read_config import read_config
 from cse_190_assi_3.msg import AStarPath, PolicyList
@@ -15,47 +16,65 @@ class Robot():
         self.map = Map([self.config.walls], [self.config.pits],
                        [self.config.goalState], self.config.map_width,
                        self.config.map_height)
+        self.map_oracle = None
+        self.mdp_oracle = None
+        self.val_iter = None
+        self.q_learner = None
+        self.featureExtractor = None
 
-        #self.map_oracle = MapOracle(self.map, self.config.r_wall,
-        #                            self.config.r_step, self.config.r_goal, self.config.r_pit)
+        if self.config.isMovementUncertain == False:
+            print "[ROBOT] Initializing with deterministic movement"
+            self.map_oracle = MapOracle(self.map, self.config.r_wall,
+                                        self.config.r_step, self.config.r_goal, self.config.r_pit)
+        else:
+            print "[ROBOT] Initializing with uncertain movement"
+            self.map_oracle = UncertainMapOracle(self.map, self.config.r_wall,
+                                        self.config.r_step, self.config.r_goal, self.config.r_pit, 
+                                        self.config.p_forward, self.config.p_backward, 
+                                        self.config.p_left, self.config.p_right)
 
-        self.map_oracle = UncertainMapOracle(self.map, self.config.r_wall,
-                                    self.config.r_step, self.config.r_goal, self.config.r_pit, 
-                                    self.config.p_forward, self.config.p_backward, 
-                                    self.config.p_left, self.config.p_right)
 
-        self.mdp_oracle = MDPOracle(self.map_oracle, self.config.p_forward, self.config.p_backward,
-                                   self.config.p_left, self.config.p_right)
+        if self.config.controller == ConfigAccess.CONTROLLER_VALUE_ITERATION:
+            print "[ROBOT] Value iteration controller picked."
+            self.mdp_oracle = MDPOracle(self.map_oracle, self.config.p_forward, self.config.p_backward,
+                                       self.config.p_left, self.config.p_right)
 
-        self.val_iter = ValueIteration(self.mdp_oracle, self.config.discount_factor,
-                                       self.config.max_iterations, self.config.threshold_diff)
-
-        #self.q_learner = QLearner(self.map_oracle, self.config.discount_factor, self.config.alpha,
-        #                            self.config.epsilon)
-        self.featureExtractor = FeatureExtractor(self.map_oracle)
-        self.q_learner = ApproximateQLearner(self.map_oracle, self.config.discount_factor, 
-                                             self.config.alpha, self.config.epsilon,
-                                             self.featureExtractor)
+            self.val_iter = ValueIteration(self.mdp_oracle, self.config.discount_factor,
+                                           self.config.max_iterations, self.config.threshold_diff)
+        elif self.config.controller == ConfigAccess.CONTROLLER_Q_LEARNER:
+            print "[ROBOT] Q Learning controller picked."
+            self.q_learner = QLearner(self.map_oracle, self.config.discount_factor, self.config.alpha,
+                                        self.config.epsilon)
+        elif self.config.controller == ConfigAccess.CONTROLLER_APPROX_Q_LEARNER:
+            print "[ROBOT] Approximate Q Learning controller picked."
+            self.featureExtractor = FeatureExtractor(self.map_oracle)
+            self.q_learner = ApproximateQLearner(self.map_oracle, self.config.discount_factor, 
+                                                 self.config.alpha, self.config.epsilon,
+                                                 self.featureExtractor)
 
         self.initConnections()
 
         rospy.sleep(5)
         print "Starting to do stuff..."
 
-        #self.doMain()
-        self.doLearningMain()
+        if self.config.controller == ConfigAccess.CONTROLLER_VALUE_ITERATION:
+            self.doMain()
+        else:
+            self.doLearningMain()
 
     def doLearningMain(self):
+        print "Runnning learning loop instead of offline value iteration"
+        print "EPISODES COMPLETED ",
         for x in xrange(0, self.config.max_iterations):
-            print "Running episode " + str(x)
             while True:
                 res = self.q_learner.single_iteration()
-                self.publishIterationPolicies(self.q_learner.gatherPolicies())
                 if not res:
-                    print "Episode finished."
+                    self.publishIterationPolicies(self.q_learner.gatherPolicies())
                     break
-            print "Round " + str(x) + "/" + str(self.config.max_iterations) + " done"
+            print str(x) + "...",
+            sys.stdout.flush()
 
+        print "\n" + str(self.config.max_iterations) + " complete. Exiting..."
         self.doShutdown()
 
     def doMain(self):
@@ -148,6 +167,9 @@ class Robot():
 
 
 class ConfigAccess(object):
+    CONTROLLER_VALUE_ITERATION = 0
+    CONTROLLER_Q_LEARNER = 1
+    CONTROLLER_APPROX_Q_LEARNER = 2
     def __init__(self):
         self.config = read_config()
 
@@ -170,6 +192,16 @@ class ConfigAccess(object):
         self.p_left = self.config["prob_move_left"]
         self.p_right = self.config["prob_move_right"]
 
+        self.controller = self.CONTROLLER_VALUE_ITERATION
+        controller_choice = self.config["controller"].strip()
+        if controller_choice == "ValueIteration":
+            self.controller = self.CONTROLLER_VALUE_ITERATION
+        elif controller_choice == "QLearner":
+            self.controller = self.CONTROLLER_Q_LEARNER
+        elif controller_choice == "ApproxQLearner":
+            self.controller = self.CONTROLLER_APPROX_Q_LEARNER
+
+        self.isMovementUncertain = self.config["uncertain_movement"]
 
 if __name__ == "__main__":
     Robot()

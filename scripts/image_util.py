@@ -26,6 +26,7 @@ img_map = {
 }
 
 height, width, layers = MAP_SHAPE
+oldest_iter = 0
 
 def save_image_for_iteration(policy_list, iteration):
     #Creating an empty map of white spaces
@@ -37,6 +38,7 @@ def save_image_for_iteration(policy_list, iteration):
             new_pos_col = ((col + 1) * 4) + (col * 20)
             empty_map[new_pos_row : new_pos_row + 20, new_pos_col : new_pos_col + 20] = img_map[policy_list[row][col]]
     cv2.imwrite("../saved_video/iteration_" + str(iteration) + ".jpg", empty_map)
+    oldest_iter = iteration
 
 
 def generate_video(no_of_iterations):
@@ -47,5 +49,6 @@ def generate_video(no_of_iterations):
         img = cv2.imread(file_name)
         video.write(cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR))
         #This removes the image after stitching it to the video. Please comment this if you want the images to be saved
-        os.remove(file_name)
+        if not (str(oldest_iter) in file_name):
+            os.remove(file_name)
     video.release()

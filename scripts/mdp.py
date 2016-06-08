@@ -10,6 +10,7 @@ class MapOracle(object):
         self.r_step = r_s
         self.r_goal = r_g
         self.r_pit  = r_p
+        print "Deterministic MapOracle initialized."
 
     def getReward(self, state, action, landedState):
         if state in self.map.pit_locs:
@@ -39,6 +40,9 @@ class MapOracle(object):
             if (not (s in self.map.wall_locs)) and (not (s in self.map.pit_locs)):
                 states.append(s)
         return states
+
+    def neighborExpansionAdaptor(self, state):
+        return self.__neighborExpansionAdaptor(state)
 
     def __neighborExpansionAdaptor(self, state):
         neighbors, arrivalMethods = self.map.expandNodeNeighbors(state)
@@ -94,6 +98,7 @@ class UncertainMapOracle(MapOracle):
         self.p_backward = p_b
         self.p_left = p_l
         self.p_right = p_r
+        print "Uncertain MapOracle initialized."
 
     def makeMove(self, state, action):
         move_bindings = {
@@ -206,7 +211,7 @@ class MDPOracle(object):
             print "This should have never happened."
 
         res = []
-        for n, method in self.map_oracle.__neighborExpansionAdaptor(state):
+        for n, method in self.map_oracle.neighborExpansionAdaptor(state):
             res.append( (n, move_bindings[method]) )
         return res
 
@@ -218,22 +223,23 @@ class QLearner(object):
         self.alpha = learning_rate
         self.epsilon = epsilon
         self.currentState = None
+        print "Q-Learning controller initialized."
 
     def single_iteration(self):
         if self.currentState is None: # First round iter
-            print "Picking initial state at random."
+            #print "Picking initial state at random."
             # NOTE: This starting state *may* end up being a goal state. Make sure that doesn't happen.
             tempState = random.sample(self.map_oracle.getStates(), 1)[0]
             while self.map_oracle.map.isGoalState(tempState):
                 tempState = random.sample(self.map_oracle.getStates(), 1)[0]
             self.currentState = tempState
-            print "\tPicked " + str(self.currentState)
+            #print "\tPicked " + str(self.currentState)
 
         #print "Currently at state " + str(self.currentState)
 
         if self.map_oracle.map.isGoalState(self.currentState) or self.currentState.isPit:
             self.currentState = None
-            print "Current state is goal state or Pit, end episode."
+            #print "Current state is goal state or Pit, end episode."
             return False # CANNOT continue.
 
         action = self.getNextAction(self.currentState)
@@ -328,6 +334,7 @@ class ApproximateQLearner(QLearner):
         super(ApproximateQLearner, self).__init__(mapOracle, discount, learning_rate, epsilon)
         self.featureExtractor = featureExtractor
         self.weights = {"default": 1.0, "hit_pit": random.random(), "hit_wall": random.random(), "hit_goal":random.random(), "goal_closeness": random.random()}
+        print "Approximate Q-Learning module initialized."
        
 
     def __computeQValue(self, state, action):
@@ -376,22 +383,23 @@ class ValueIteration(object):
         self.compare_threshold = threshold
         self.current_delta = None
         self.can_stop = False
+        print "Value Iteration controller initialized."
 
     def single_iteration(self):
         # First, copy the old list so we dont have conflicts
         oldqvals = self.qvalues.copy()
         delta = 0
         # Calc for every state
-        for state in self.mdp.getStates():
+        for state in self.mdp.map_oracle.getStates():
             # For every possible action from this state...
             arglist = []
-            for action in self.mdp.getPossibleActions(state):
+            for action in self.mdp.map_oracle.getPossibleActions(state):
                 # So now we have S, a....need S' ?
                 q = 0
                 for neighbor, prob in self.mdp.getPossibleNeighbors(state, action):
                     # S, a, S'
                     # Need: Transition prob, reward, old val
-                    reward = self.mdp.getReward(state, action, neighbor)
+                    reward = self.mdp.map_oracle.getReward(state, action, neighbor)
                     old_val = self.values[neighbor] if self.values.has_key(neighbor) else 0
 
                     # Calc...
@@ -414,11 +422,11 @@ class ValueIteration(object):
             self.can_stop = True
 
     def gatherPolicies(self):
-        arr = [[0 for x in xrange(0, self.mdp.map.map_width)] for y in xrange(0, self.mdp.map.map_height)]
-        for row, col in product(xrange(0, self.mdp.map.map_height), xrange(0, self.mdp.map.map_width)):
+        arr = [[0 for x in xrange(0, self.mdp.map_oracle.map.map_width)] for y in xrange(0, self.mdp.map_oracle.map.map_height)]
+        for row, col in product(xrange(0, self.mdp.map_oracle.map.map_height), xrange(0, self.mdp.map_oracle.map.map_width)):
             s = State(Point(row, col))
             res = []
-            for action in self.mdp.getPossibleActions(s):
+            for action in self.mdp.map_oracle.getPossibleActions(s):
                 if self.qvalues.has_key( (s, action) ):
                     res.append( (action, self.qvalues[ (s, action) ]) )
             # Find max for this state
